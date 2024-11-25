@@ -1,12 +1,14 @@
-const mongoose = require("mongoose");
-const PessoaSchema = require("./Pessoa");
+const mongoose = require('mongoose');
 
 const PessoaJuridicaSchema = new mongoose.Schema({
-    ...PessoaSchema.obj,
-    cnpj: { type: String, required: true, unique: true },
-    razaoSocial: { type: String, required: true },
-    nomeFantasia: { type: String, required: true },
-    empresas: [{ type: mongoose.Schema.Types.ObjectId, ref: "Empresa" }],
+  nome: { type: String, required: true },
+  endereco: { type: String, required: true },
+  cnpj: { type: String, required: true, unique: true },
+  razaoSocial: { type: String, required: true },
+  nomeFantasia: { type: String, required: true },
 });
 
-module.exports = mongoose.model("PessoaJuridica", PessoaJuridicaSchema);
+PessoaJuridicaSchema.index({ cnpj: 1 }, { unique: true });
+
+
+module.exports = mongoose.model('PessoaJuridica', PessoaJuridicaSchema);

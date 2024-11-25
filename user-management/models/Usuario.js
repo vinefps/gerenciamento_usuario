@@ -1,10 +1,13 @@
-const mongoose = require("mongoose");
-const PessoaSchema = require("./Pessoa");
+const mongoose = require('mongoose');
 
 const UsuarioSchema = new mongoose.Schema({
-    ...PessoaSchema.obj,
-    email: { type: String, required: true, unique: true },
-    senha: { type: String, required: true },
+  nome: { type: String, required: true },
+  endereco: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  senha: { type: String, required: true },
 });
 
-module.exports = mongoose.model("Usuario", UsuarioSchema);
+// Garante o índice único
+UsuarioSchema.index({ email: 1 }, { unique: true });
+
+module.exports = mongoose.model('Usuario', UsuarioSchema);
