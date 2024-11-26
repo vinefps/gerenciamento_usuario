@@ -1,27 +1,33 @@
 const PessoaFisica = require('../models/PessoaFisica');
+const Pessoa = require('../models/Pessoa');
+const mongoose = require('mongoose');
 
-const createPessoaFisica = async (req, res) => {
+
+
+
+exports.createPessoaFisica = async (req, res) => {
   try {
-    console.log('Request Body:', req.body); // Debug log
-    const pessoaFisica = new PessoaFisica(req.body);
-    const savedPessoaFisica = await pessoaFisica.save();
+    const { pessoaId, cpf, dataNascimento } = req.body;
 
-    // Busca o documento completo com todas as propriedades
-    const populatedPessoaFisica = await PessoaFisica.findById(savedPessoaFisica._id).lean();
-    res.status(201).json(populatedPessoaFisica);
-  } catch (err) {
-    console.error('Erro ao criar Pessoa Física:', err.message);
-    res.status(400).json({ message: err.message });
+    if (!pessoaId || !cpf || !dataNascimento) {
+      return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
+    }
+
+    const novaPessoaFisica = await PessoaFisica.create({ pessoaId, cpf, dataNascimento });
+    res.status(201).json(novaPessoaFisica);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 };
 
-const getAllPessoasFisicas = async (req, res) => {
+
+exports.getPessoasFisicas = async (req, res) => {
   try {
-    const pessoasFisicas = await PessoaFisica.find().lean();
+    // Busca todas as pessoas físicas e popula os dados da Pessoa associada
+    const pessoasFisicas = await PessoaFisica.find().populate('pessoaId');
     res.status(200).json(pessoasFisicas);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
-module.exports = { createPessoaFisica, getAllPessoasFisicas };

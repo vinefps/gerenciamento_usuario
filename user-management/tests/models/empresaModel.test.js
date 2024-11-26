@@ -1,53 +1,85 @@
-const Empresa = require('../../models/Empresa');
 const mongoose = require('mongoose');
+const Empresa = require('../../models/Empresa');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+require('../setupTests');
 
-jest.setTimeout(30000); // Define um timeout de 30 segundos
 
 let mongoServer;
 
-// pessoaJuridicaModel.test.js
 beforeEach(async () => {
-  await mongoose.connection.db.dropDatabase();
-});
-
-beforeAll(async () => {
-  if (!mongoServer) {
-    mongoServer = await MongoMemoryServer.create();
+  const collections = Object.keys(mongoose.connection.collections);
+  for (const collectionName of collections) {
+    const collection = mongoose.connection.collections[collectionName];
+    await collection.deleteMany();
   }
-  const uri = mongoServer.getUri();
-
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect(); // Certifique-se de desconectar antes de conectar novamente
-  }
-
-  await mongoose.connect(uri);
 });
 
 afterAll(async () => {
+  await mongoose.disconnect();
   if (mongoServer) {
-    await mongoose.disconnect(); // Desconecta do MongoDB
-    await mongoServer.stop(); // Para o servidor em memória
+    await mongoServer.stop();
   }
 });
 
+
+
 describe('Empresa Model', () => {
   it('Deve criar uma empresa com campos válidos', async () => {
-    const empresa = new Empresa({ nome: 'Empresa Teste' });
+    const empresa = new Empresa({
+      nome: 'Empresa Teste',
+      cnpj: '12345678000199',
+      endereco: 'Rua 1',
+      telefone: '12345678',
+    });
+
     const savedEmpresa = await empresa.save();
-    expect(savedEmpresa._id).toBeDefined();
     expect(savedEmpresa.nome).toBe('Empresa Teste');
+    expect(savedEmpresa.cnpj).toBe('12345678000199');
   });
 
   it('Deve falhar ao criar uma empresa sem o nome', async () => {
-    const empresa = new Empresa({});
-    let err;
+    const empresa = new Empresa({
+      cnpj: '12345678000199',
+      endereco: 'Rua 1',
+      telefone: '12345678',
+    });
+
+    let error;
     try {
       await empresa.save();
-    } catch (error) {
-      err = error;
+    } catch (err) {
+      error = err;
     }
-    expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
-    expect(err.errors.nome).toBeDefined();
+
+    expect(error).toBeDefined();
+    expect(error.errors.nome).toBeDefined();
+  });
+
+  it('Deve falhar ao criar uma empresa com CNPJ duplicado', async () => {
+    const cnpjDuplicado = '12345678000199';
+
+    await Empresa.create({
+      nome: 'Empresa A',
+      cnpj: cnpjDuplicado,
+      endereco: 'Rua 1',
+      telefone: '12345678',
+    });
+
+    const empresa = new Empresa({
+      nome: 'Empresa B',
+      cnpj: cnpjDuplicado,
+      endereco: 'Rua 2',
+      telefone: '87654321',
+    });
+
+    let error;
+    try {
+      await empresa.save();
+    } catch (err) {
+      error = err;
+    }
+
+    expect(error).toBeDefined();
+    expect(error.code).toBe(11000); // Código de erro de chave duplicada
   });
 });

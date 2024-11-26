@@ -1,24 +1,26 @@
-const Usuario = require("../models/Usuario");
+const Usuario = require('../models/Usuario');
+const Pessoa = require('../models/Pessoa');
+const mongoose = require('mongoose');
 
-// Criar um novo usuário
-const createUsuario = async (req, res) => {
+
+exports.createUsuario = async (req, res) => {
+  const { nome, email, senha } = req.body;
+  if (!nome || !email || !senha) {
+    return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
+  }
   try {
-    const usuario = new Usuario(req.body);
-    await usuario.save();
-    res.status(201).json(usuario);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
+    const novoUsuario = await Usuario.create({ nome, email, senha });
+    res.status(201).json(novoUsuario);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 };
 
-// Listar todos os usuários
-const getAllUsuarios = async (req, res) => {
+exports.getUsuarios = async (req, res) => {
   try {
     const usuarios = await Usuario.find();
     res.status(200).json(usuarios);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
-
-module.exports = { createUsuario, getAllUsuarios };

@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 
-const PessoaSchema = new mongoose.Schema({
-  nome: { type: String, required: true },
-  endereco: { type: String, required: true },
-});
+const pessoaSchema = new mongoose.Schema({
+    nome: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+}, { timestamps: true });
 
-module.exports = mongoose.model('Pessoa', PessoaSchema);
+module.exports = mongoose.model('Pessoa', pessoaSchema);

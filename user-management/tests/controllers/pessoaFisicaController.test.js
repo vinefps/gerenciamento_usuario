@@ -1,55 +1,107 @@
-const request = require('supertest');
-const app = require('../../index');
-const mongoose = require('mongoose');
+const { createPessoaFisica, getPessoasFisicas } = require('../../controllers/pessoaFisicaController');
+const PessoaFisica = require('../../models/PessoaFisica');
+const Pessoa = require('../../models/Pessoa');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+const mongoose = require('mongoose');
+
+require('../setupTests');
+
+
+const request = require('supertest');
+const app = require('../../server'); // Certifique-se de exportar o Express app
+
 let mongoServer;
 
-jest.setTimeout(30000);
-
-beforeAll(async () => {
-  if (!mongoServer) {
-    mongoServer = await MongoMemoryServer.create();
+beforeEach(async () => {
+  const collections = Object.keys(mongoose.connection.collections);
+  for (const collectionName of collections) {
+    const collection = mongoose.connection.collections[collectionName];
+    await collection.deleteMany();
   }
-  const uri = mongoServer.getUri();
-
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-  }
-
-  await mongoose.connect(uri);
 });
 
 afterAll(async () => {
+  await mongoose.disconnect();
   if (mongoServer) {
-    await mongoose.disconnect();
     await mongoServer.stop();
   }
 });
 
-beforeEach(async () => {
-  await mongoose.connection.db.dropDatabase();
-});
 
-describe('Pessoa Física Controller', () => {
-  it('Deve criar uma nova pessoa física', async () => {
-    const res = await request(app)
-      .post('/api/pessoas-fisicas')
-      .send({
-        nome: 'Maria Silva',
-        endereco: 'Rua das Flores, 123',
+
+describe('PessoaFisica Controller', () => {
+  // Exemplo de teste corrigido
+  it('Deve criar uma nova Pessoa Física', async () => {
+    // Mock da requisição
+    const req = {
+      body: {
+        pessoaId: '6746336c3f772c2481e19165',
         cpf: '12345678900',
-        dataNascimento: '1990-01-01',
-      });
+        dataNascimento: '1990-05-15',
+      },
+    };
 
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toHaveProperty('nome', 'Maria Silva');
-    expect(res.body).toHaveProperty('endereco', 'Rua das Flores, 123');
-    expect(res.body).toHaveProperty('cpf', '12345678900');
+    // Mock da resposta
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    // Chama o controlador (ajuste conforme o nome e localização do seu controlador)
+    await createPessoaFisica(req, res);
+
+    // Verifica se o status foi chamado com o código correto
+    expect(res.status).toHaveBeenCalledWith(201);
+
+    // Aqui entra a verificação do objeto retornado
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pessoaId: req.body.pessoaId,
+        cpf: req.body.cpf,
+        dataNascimento: expect.any(String), // Ou Date, dependendo do formato
+      })
+    );
+
   });
 
-  it('Deve listar todas as pessoas físicas', async () => {
+
+  it('Deve falhar ao criar uma Pessoa Física com CPF duplicado', async () => {
+    const cpfDuplicado = '12345678900';
+
+    await PessoaFisica.create({
+      pessoaId: new mongoose.Types.ObjectId(),
+      cpf: cpfDuplicado,
+      dataNascimento: new Date('1990-05-15'),
+    });
+
+    const pessoaFisica = new PessoaFisica({
+      pessoaId: new mongoose.Types.ObjectId(),
+      cpf: cpfDuplicado,
+      dataNascimento: new Date('1992-08-25'),
+    });
+
+    let err;
+    try {
+      await pessoaFisica.save();
+    } catch (error) {
+      err = error;
+    }
+
+    expect(err).toBeDefined();
+    expect(err.code).toBe(11000); // Código de duplicação de chave
+  });
+
+  it('Deve listar todas as Pessoas Físicas', async () => {
+    const pessoa = await Pessoa.create({ nome: 'João Silva', email: 'joao@example.com' });
+    await PessoaFisica.create({
+      pessoaId: pessoa._id,
+      cpf: '12345678900',
+      dataNascimento: new Date('1990-05-15'),
+    });
+
     const res = await request(app).get('/api/pessoas-fisicas');
-    expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].cpf).toBe('12345678900');
   });
 });

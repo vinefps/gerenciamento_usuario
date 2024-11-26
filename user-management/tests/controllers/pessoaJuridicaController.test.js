@@ -1,56 +1,77 @@
-const request = require('supertest');
-const app = require('../../index');
-const mongoose = require('mongoose');
+const { createPessoaJuridica, getPessoasJuridicas } = require('../../controllers/pessoaJuridicaController');
+const PessoaJuridica = require('../../models/PessoaJuridica');
+const Pessoa = require('../../models/Pessoa');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+const mongoose = require('mongoose');
+
+require('../setupTests');
 
 
-jest.setTimeout(30000); // Define timeout de 30 segundos
+const request = require('supertest');
+const app = require('../../server'); // Certifique-se de exportar o Express app
 
 let mongoServer;
-// pessoaJuridicaModel.test.js
 beforeEach(async () => {
-  await mongoose.connection.db.dropDatabase();
-});
-
-beforeAll(async () => {
-  if (!mongoServer) {
-    mongoServer = await MongoMemoryServer.create();
+  const collections = Object.keys(mongoose.connection.collections);
+  for (const collectionName of collections) {
+    const collection = mongoose.connection.collections[collectionName];
+    await collection.deleteMany();
   }
-  const uri = mongoServer.getUri();
-
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect(); // Certifique-se de desconectar antes de conectar novamente
-  }
-
-  await mongoose.connect(uri);
 });
 
 afterAll(async () => {
+  await mongoose.disconnect();
   if (mongoServer) {
-    await mongoose.disconnect(); // Desconecta do MongoDB
-    await mongoServer.stop(); // Para o servidor em memória
+    await mongoServer.stop();
   }
 });
-describe('Pessoa Jurídica Controller', () => {
-  it('Deve criar uma nova pessoa jurídica', async () => {
-    const res = await request(app)
-      .post('/api/pessoas-juridicas')
-      .send({
-        nome: 'Empresa Exemplo',
-        endereco: 'Avenida Central, 123',
-        cnpj: '12345678000100',
-        razaoSocial: 'Exemplo Razão Social',
-        nomeFantasia: 'Fantasia Exemplo'
-      });
-  
-    expect(res.statusCode).toBe(201);
-    expect(res.body.cnpj).toBe('12345678000100');
-  });
-  
 
-  it('Deve listar todas as pessoas jurídicas', async () => {
+
+
+describe('Pessoa Jurídica Controller', () => {
+  it('Deve criar uma nova Pessoa Jurídica', async () => {
+    const pessoa = await Pessoa.create({ nome: 'Empresa Y', email: 'empresa@example.com' });
+
+    const req = {
+      body: {
+        pessoaId: pessoa._id.toString(),
+        cnpj: '12345678000199',
+        razaoSocial: 'Empresa X',
+      },
+    };
+
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await createPessoaJuridica(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cnpj: '12345678000199',
+        pessoaId: pessoa._id.toString(),
+        razaoSocial: 'Empresa X',
+      })
+    );
+
+
+
+  });
+
+  it('Deve listar todas as Pessoas Jurídicas', async () => {
+    const pessoa = await Pessoa.create({ nome: 'Empresa Z', email: 'empresa2@example.com' });
+
+    await PessoaJuridica.create({
+      pessoaId: pessoa._id,
+      cnpj: '98765432000100',
+      razaoSocial: 'Empresa Z',
+    });
+
     const res = await request(app).get('/api/pessoas-juridicas');
-    expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].cnpj).toBe('98765432000100');
   });
 });

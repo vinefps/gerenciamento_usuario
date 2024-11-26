@@ -1,47 +1,71 @@
-const request = require('supertest');
-const app = require('../../index'); // Certifique-se de exportar sua instância do Express em index.js
+const { createEmpresa, getEmpresas } = require('../../controllers/empresaController');
+const Empresa = require('../../models/Empresa');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 
-const { MongoMemoryServer } = require('mongodb-memory-server');
+require('../setupTests');
 
-jest.setTimeout(30000); // Define um timeout de 30 segundos
+
+
+
+jest.mock('../../models/Empresa');
 
 let mongoServer;
-// pessoaJuridicaModel.test.js
+
 beforeEach(async () => {
-  await mongoose.connection.db.dropDatabase();
-});
-
-beforeAll(async () => {
-  if (!mongoServer) {
-    mongoServer = await MongoMemoryServer.create();
+  const collections = Object.keys(mongoose.connection.collections);
+  for (const collectionName of collections) {
+    const collection = mongoose.connection.collections[collectionName];
+    await collection.deleteMany();
   }
-  const uri = mongoServer.getUri();
-
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect(); // Certifique-se de desconectar antes de conectar novamente
-  }
-
-  await mongoose.connect(uri);
 });
 
 afterAll(async () => {
+  await mongoose.disconnect();
   if (mongoServer) {
-    await mongoose.disconnect(); // Desconecta do MongoDB
-    await mongoServer.stop(); // Para o servidor em memória
+    await mongoServer.stop();
   }
 });
 
+
 describe('Empresa Controller', () => {
   it('Deve criar uma nova empresa', async () => {
-    const res = await request(app)
-      .post('/api/empresas')
-      .send({
-        nome: 'Empresa Teste',
-      });
+    const req = { body: { nome: 'Empresa X', cnpj: '12345678000199', endereco: 'Rua 1', telefone: '12345678' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
 
-    expect(res.statusCode).toEqual(201);
-    expect(res.body).toHaveProperty('_id');
-    expect(res.body.nome).toBe('Empresa Teste');
+    Empresa.prototype.save.mockResolvedValue({
+      _id: 'mockedId',
+      nome: 'Empresa X',
+      cnpj: '12345678000199',
+      endereco: 'Rua 1',
+      telefone: '12345678',
+    });
+
+    await createEmpresa(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({
+      _id: 'mockedId',
+      nome: 'Empresa X',
+      cnpj: '12345678000199',
+      endereco: 'Rua 1',
+      telefone: '12345678',
+    });
+  });
+
+  it('Deve buscar todas as empresas', async () => {
+    const empresas = [
+      { _id: 'id1', nome: 'Empresa Y', cnpj: '98765432000100', endereco: 'Rua 2', telefone: '87654321' },
+    ];
+
+    Empresa.find.mockResolvedValue(empresas);
+
+    const req = {};
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await getEmpresas(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(empresas);
   });
 });

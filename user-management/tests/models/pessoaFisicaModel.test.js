@@ -1,55 +1,84 @@
-const PessoaFisica = require('../../models/PessoaFisica');
 const mongoose = require('mongoose');
-
+const PessoaFisica = require('../../models/PessoaFisica');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+
+
+require('../setupTests');
+
+
 let mongoServer;
 
-
-jest.setTimeout(30000); // Define um timeout de 30 segundos
-
-// pessoaJuridicaModel.test.js
 beforeEach(async () => {
-  await mongoose.connection.db.dropDatabase();
-});
-
-describe('Pessoa Física Model', () => {
-  it('Deve salvar uma pessoa física com dados válidos', async () => {
-    const pessoaFisica = new PessoaFisica({
-      nome: 'Maria',
-      endereco: 'Rua das Flores, 123',
-      cpf: '12345678900',
-      dataNascimento: '1990-01-01',
-    });
-    const savedPessoaFisica = await pessoaFisica.save();
-    expect(savedPessoaFisica._id).toBeDefined();
-    expect(savedPessoaFisica.cpf).toBe('12345678900');
-  });
-
-  it('Deve falhar ao salvar uma pessoa física sem CPF', async () => {
-    const pessoaFisica = new PessoaFisica({
-      nome: 'Maria',
-      endereco: 'Rua das Flores, 123',
-      dataNascimento: '1990-01-01',
-    });
-    await expect(pessoaFisica.save()).rejects.toThrow();
-  });
-});
-beforeAll(async () => {
-  if (!mongoServer) {
-    mongoServer = await MongoMemoryServer.create();
+  const collections = Object.keys(mongoose.connection.collections);
+  for (const collectionName of collections) {
+    const collection = mongoose.connection.collections[collectionName];
+    await collection.deleteMany();
   }
-  const uri = mongoServer.getUri();
-
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect(); // Certifique-se de desconectar antes de conectar novamente
-  }
-
-  await mongoose.connect(uri);
 });
 
 afterAll(async () => {
+  await mongoose.disconnect();
   if (mongoServer) {
-    await mongoose.disconnect(); // Desconecta do MongoDB
-    await mongoServer.stop(); // Para o servidor em memória
+    await mongoServer.stop();
   }
+});
+
+
+
+describe('PessoaFisica Model', () => {
+  it('Deve ser inválido se algum campo obrigatório estiver ausente', async () => {
+    const pessoaFisica = new PessoaFisica({
+      cpf: '12345678900',
+      // Falta dataNascimento e pessoaId
+    });
+
+    let err;
+    try {
+      await pessoaFisica.validate();
+    } catch (error) {
+      err = error;
+    }
+
+    expect(err).toBeDefined();
+    expect(err.errors.dataNascimento).toBeDefined();
+    expect(err.errors.pessoaId).toBeDefined();
+  });
+
+  it('Deve criar uma Pessoa Física válida', async () => {
+    const pessoaFisica = new PessoaFisica({
+      pessoaId: new mongoose.Types.ObjectId(),
+      cpf: '12345678900',
+      dataNascimento: new Date('1990-05-15'),
+    });
+
+    const savedPessoaFisica = await pessoaFisica.save();
+    expect(savedPessoaFisica).toBeDefined();
+    expect(savedPessoaFisica.cpf).toBe('12345678900');
+  });
+
+  it('Deve falhar ao criar uma Pessoa Física com CPF duplicado', async () => {
+    const cpfDuplicado = '12345678900';
+
+    await PessoaFisica.create({
+      pessoaId: new mongoose.Types.ObjectId(),
+      cpf: cpfDuplicado,
+      dataNascimento: new Date('1990-05-15'),
+    });
+
+    const pessoaFisica = new PessoaFisica({
+      pessoaId: new mongoose.Types.ObjectId(),
+      cpf: cpfDuplicado,
+      dataNascimento: new Date('1992-08-25'),
+    });
+
+    let err;
+    try {
+      await pessoaFisica.save();
+    } catch (error) {
+      err = error;
+    }
+
+    expect(err).toBeDefined();
+    expect(err.code).toBe(11000); // Código de duplicação de chave
+  });
 });

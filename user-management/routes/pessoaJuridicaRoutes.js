@@ -1,8 +1,8 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { createPessoaJuridica, getAllPessoasJuridicas } = require("../controllers/pessoaJuridicaController");
+const { createPessoaJuridica, getPessoasJuridicas } = require('../controllers/pessoaJuridicaController');
 
-router.post("/", createPessoaJuridica);
-router.get("/", getAllPessoasJuridicas);
+router.post('/', createPessoaJuridica);
+router.get('/', getPessoasJuridicas);
 
 module.exports = router;

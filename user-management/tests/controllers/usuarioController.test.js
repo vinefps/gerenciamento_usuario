@@ -1,56 +1,101 @@
-const request = require('supertest');
-const app = require('../../index');
+const { createUsuario, getUsuarios } = require('../../controllers/usuarioController');
+const Usuario = require('../../models/Usuario');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 
-const { MongoMemoryServer } = require('mongodb-memory-server');
+require('../setupTests');
+
+
+const request = require('supertest');
+const app = require('../../server'); // Certifique-se de exportar o Express app
+
 let mongoServer;
-
-
-jest.setTimeout(30000); // Define um timeout de 30 segundos
-// pessoaJuridicaModel.test.js
-beforeAll(async () => {
-  if (!mongoServer) {
-    mongoServer = await MongoMemoryServer.create();
+beforeEach(async () => {
+  const collections = Object.keys(mongoose.connection.collections);
+  for (const collectionName of collections) {
+    const collection = mongoose.connection.collections[collectionName];
+    await collection.deleteMany();
   }
-  const uri = mongoServer.getUri();
-
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect(); // Certifique-se de desconectar antes de conectar novamente
-  }
-
-  await mongoose.connect(uri);
 });
 
 afterAll(async () => {
+  await mongoose.disconnect();
   if (mongoServer) {
-    await mongoose.disconnect(); // Desconecta do MongoDB
-    await mongoServer.stop(); // Para o servidor em memória
+    await mongoServer.stop();
   }
 });
-beforeEach(async () => {
-  await mongoose.connection.db.dropDatabase();
-});
 
-describe('Usuário Controller', () => {
-  it('Deve criar um novo usuário', async () => {
-    const res = await request(app)
-      .post('/api/usuarios')
-      .send({
-        nome: 'Usuário Teste',
-        endereco: 'Rua ABC, 123',
-        email: 'usuario@teste.com',
-        senha: '123456'
-      });
-  
-    expect(res.statusCode).toBe(201);
-    expect(res.body.email).toBe('usuario@teste.com');
+
+describe('Usuario Controller', () => {
+  it('Deve criar um usuário', async () => {
+    const req = {
+      body: {
+        nome: 'João da Silva', // Inclua o campo obrigatório 'nome'
+        email: 'joao@example.com',
+        senha: 'senha123',
+      },
+    };
+
+
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await createUsuario(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nome: 'João da Silva',
+        email: 'joao@example.com',
+      })
+    );
+
   });
-  
 
+  it('Deve buscar todos os usuários', async () => {
+    await Usuario.create({
+      nome: 'João da Silva',
+      email: 'joao@example.com',
+      senha: '123456',
+    });
 
-  it('Deve listar todos os usuários', async () => {
     const res = await request(app).get('/api/usuarios');
-    expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].email).toBe('joao@example.com');
+  });
+
+  it('Deve retornar erro ao criar usuário com email duplicado', async () => {
+    await Usuario.create({
+      nome: 'João da Silva',
+      email: 'duplicado@example.com',
+      senha: 'senha123',
+    });
+
+    const req = {
+      body: {
+        nome: 'João da Silva', // Inclua o campo obrigatório 'nome'
+        email: 'joao@example.com',
+        senha: 'senha123',
+      },
+    };
+
+
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await createUsuario(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'O email já está em uso.',
+      })
+    );
   });
 });
